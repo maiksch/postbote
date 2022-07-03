@@ -1,0 +1,47 @@
+{
+	"requests": [
+		{
+			"url": "http://localhost:7071/api/monte-carlo",
+			"method": "POST",
+			"body": {
+				"anzahl_szenarien" : 1000000,
+				"umsaetze": [
+					{
+						"u_bezeichnung": "Jahresumsatz Produkt A", 
+						"u_verteiltung": "normalverteilung", 
+						"u_parameter": [20000, 2000]
+					}
+				],
+				"kosten": [
+					 {
+						"k_bezeichnung": "Personalkosten", 
+						"k_verteiltung": "dreiecksverteilung", 
+						"k_parameter": [100, 1000, 500]
+					},
+					{
+						"k_bezeichnung": "Sachkosten", 
+						"k_verteiltung": "gleichverteilung", 
+						"k_parameter": [1500, 5000]
+					}
+				],
+				"risiken": [
+					 {
+						"r_bezeichnung": "Maschine fällt aus", 
+						"r_verteiltung": "binomialverteilung", 
+						"r_parameter": [700, 0.1]
+					},
+					{
+						"r_bezeichnung": "Materialverlust", 
+						"r_verteiltung": "gleichverteilung", 
+						"r_parameter": [500, 700]
+					}
+				]
+			},
+			"contentType": "application/json",
+			"params": {
+				"test": "test",
+				"Number": "123"
+			}
+		}
+	]
+}

@@ -1,32 +1,101 @@
 package main
 
 import (
-	"fmt"
+	"bytes"
+	"encoding/json"
+	"io/ioutil"
 	"log"
 	"net/http"
 )
 
+type Request struct {
+	URL         string                 `json:"url"`
+	Method      string                 `json:"method"`
+	Body        interface{}            `json:"body"`
+	ContentType string                 `json:"contentType"`
+	Params      map[string]interface{} `json:"params"`
+}
+
+func (req Request) HasBody() bool {
+	return req.Body != nil && req.Method != "GET" && req.Method != "DELETE"
+}
+
+type Data struct {
+	Requests []Request `json:"requests"`
+}
+
+func ReadResponse(response *http.Response) string {
+	defer response.Body.Close()
+
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		panic(err)
+	}
+
+	return string(body)
+}
+
 func main() {
-	fmt.Println("Moinsen Welt")
+	log.Println("Postbote start")
 
-	req, err := http.NewRequest("GET", "https://localhost:5001/api/search", nil)
+	file, err := ioutil.ReadFile("postbote.json")
 	if err != nil {
-		log.Fatal(err)
-		return
+		panic(err)
 	}
 
+	data := new(Data)
+	if err := json.Unmarshal(file, &data); err != nil {
+		panic(err)
+	}
+
+	for _, request := range data.Requests {
+		Send(request)
+	}
+}
+
+func CreateQueryURL(req *http.Request, params map[string]interface{}) string {
 	query := req.URL.Query()
-	query.Add("blNumber", "123")
-	req.URL.RawQuery = query.Encode()
+	for key, value := range params {
+		switch value.(type) {
+		case string:
+			query.Add(key, value.(string))
+			break
+		case int:
+			query.Add(key, string(rune(value.(int))))
+			break
+		}
+	}
+	return query.Encode()
+} 
 
-	fmt.Println(req.URL.String())
-	
-	res, err := http.Get(req.URL.String())
-	if err != nil {
-		log.Fatal(err)	
+func Send(request Request) {
+	body := new(bytes.Buffer)
+	if request.HasBody() {
+		tmp, err := json.Marshal(request.Body)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		body = bytes.NewBuffer(tmp)
 	}
 
-	fmt.Println("Worked")
-	fmt.Println(res.Status)
+	req, err := http.NewRequest(request.Method, request.URL, body)
+	if err != nil {
+		panic(err)
+	}
+	
+	req.URL.RawQuery = CreateQueryURL(req, request.Params)
 
+	if request.ContentType != "" {
+		req.Header.Set("Content-Type", request.ContentType)
+	}
+
+	log.Println("Start request: " + req.URL.String())
+	client := new(http.Client)
+	res, err := client.Do(req)
+	if err != nil {
+		panic(err)
+	}
+
+	response := ReadResponse(res)
+	log.Println(response)
 }
