@@ -1,6 +1,10 @@
 {
 	"requests": [
 		{
+			"url": "http://localhost:7071/api/get",
+			"method": "GET"
+		},
+		{
 			"url": "http://localhost:7071/api/monte-carlo",
 			"method": "POST",
 			"body": {

@@ -3,14 +3,15 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 
 	// "github.com/charmbracelet/bubbles/key"
 	// "github.com/charmbracelet/bubbles/list"
+
 	tea "github.com/charmbracelet/bubbletea"
+	// "github.com/charmbracelet/lipgloss"
 	// "github.com/charmbracelet/lipgloss"
 )
 
@@ -30,41 +31,68 @@ type Data struct {
 	Requests []Request `json:"requests"`
 }
 
-type Model struct {
-	Selected int
-	Requests  []Request
-}
+type View int
 
-// var appStyle = lipgloss.NewStyle().Padding(1, 2)
+const (
+	listView   View = 0
+	detailView View = iota
+)
+
+type Model struct {
+	Focus           View
+	ListView        RequestListModel
+	DetailView      RequestDetailView
+	SelectedRequest Request
+}
 
 func (m Model) Init() tea.Cmd {
 	return tea.EnterAltScreen
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	var cmds []tea.Cmd
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
 		}
+	case SelectMsg:
+		m.DetailView.Request = msg.Request
+		m.Focus = detailView
+		if msg.Request.HasBody() {
+			log.Println("Has Body")
+			body, err := json.Marshal(msg.Request.Body)
+			if err != nil {
+				log.Fatalln(err)
+			}
+
+			var out bytes.Buffer
+			json.Indent(&out, body, "", "\t")
+			log.Println("Body: " + string(out.Bytes()))
+			m.DetailView.Body.SetValue(string(out.Bytes()))
+		}
+		return m, nil
 	}
 
-	return m, nil
+	if m.Focus == listView {
+		m.ListView, cmd = m.ListView.Update(msg)
+		cmds = append(cmds, cmd)
+	}
+
+	if m.Focus == detailView {
+		m.DetailView, cmd = m.DetailView.Update(msg)
+		cmds = append(cmds, cmd)
+	}
+
+	return m, tea.Batch(cmds...)
 }
 
 func (m Model) View() string {
-	view := ""
-
-	for idx, request := range m.Requests {
-		if idx == m.Selected {
-			view += ">"
-		} else {
-			view += " "
-		}
-		view += fmt.Sprintf(" %s (%s)\n", request.URL, request.Method)
-	}
-
+	view := m.ListView.View()
+	view += m.DetailView.View()
 	return view
 }
 
@@ -140,16 +168,15 @@ func main() {
 	}
 
 	model := &Model{
-		Requests: data.Requests,
-		Selected: 0,
+		ListView: RequestListModel{
+			Requests:         data.Requests,
+			CurrentSelection: 0,
+		},
+		DetailView: NewDetailView(data.Requests[0]),
 	}
 	program := tea.NewProgram(model)
 
 	if err := program.Start(); err != nil {
 		log.Fatalln(err)
 	}
-
-	// for _, request := range data.Requests {
-	// 	Send(request)
-	// }
 }
